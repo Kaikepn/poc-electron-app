@@ -33,37 +33,41 @@ function createFolder() {
 }
 
 // Função para pedir ao usuário o nome do arquivo e executá-lo
-function openAndExecuteFile() {
-  dialog.showOpenDialog(mainWindow, {
-    properties: ['openFile'],
-    title: 'Selecione o arquivo para executar',
+function openAndExecuteFileByName() {
+  dialog.showInputBox({
+    title: 'Digite o nome do arquivo para executar',
+    placeholder: 'Exemplo: jogo.exe'
   }).then(result => {
-    if (!result.canceled && result.filePaths.length > 0) {
-      const filePath = result.filePaths[0];
-      console.log(`Arquivo selecionado: ${filePath}`);
+    if (!result.canceled && result.value) {
+      const fileName = result.value;
+      const filePath = path.join(__dirname, 'Jogos', fileName);
 
-      // Executa o arquivo selecionado
-      exec(filePath, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`Erro ao executar o arquivo: ${error.message}`);
-          return;
-        }
-        if (stderr) {
-          console.error(`stderr: ${stderr}`);
-          return;
-        }
-        console.log(`stdout: ${stdout}`);
-      });
+      if (fs.existsSync(filePath)) {
+        console.log(`Executando arquivo: ${filePath}`);
+        exec(`"${filePath}"`, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Erro ao executar o arquivo: ${error.message}`);
+            return;
+          }
+          if (stderr) {
+            console.error(`stderr: ${stderr}`);
+            return;
+          }
+          console.log(`stdout: ${stdout}`);
+        });
+      } else {
+        console.error('O arquivo especificado não foi encontrado.');
+      }
     }
   }).catch(err => {
-    console.log('Erro ao abrir o arquivo:', err);
+    console.log('Erro ao obter o nome do arquivo:', err);
   });
 }
 
 app.whenReady().then(() => {
   createWindow();
   createFolder(); // Chama a função para criar a pasta
-  openAndExecuteFile(); // Chama a função para abrir e executar o arquivo
+  openAndExecuteFileByName(); // Chama a função para solicitar e executar o arquivo
 });
 
 app.on('window-all-closed', () => {
