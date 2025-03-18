@@ -1,0 +1,24 @@
+
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Teste arquivo</title>
+      </head>
+      <body>
+        <h1>Teste arquivo</h1>
+        <button id="selectFile">Selecione e rode o arquivo</button>
+        <div id="output"></div>
+        <script>
+          const { ipcRenderer } = require('electron');
+          document.getElementById('selectFile').addEventListener('click', function() {
+            ipcRenderer.send('open-file-dialog');
+          });
+          
+          ipcRenderer.on('execution-result', function(event, result) {
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerHTML += '<p>' + result + '</p>';
+          });
+        </script>
+      </body>
+    </html>
+  
