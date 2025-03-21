@@ -37,8 +37,7 @@ if (window.electronAPI) {
       if (result.success) {
         updateProgress(100);
         statusElement.textContent = 'Download finalizado!';
-        showSuccess(`Jogo baixado com sucesso: ${result.fileName}
-                     Salvo em: ${result.path}`);
+        showSuccess(`Jogo baixado com sucesso: ${result.fileName}\nSalvo em: ${result.path}`);
       } else {
         throw new Error(result.message);
       }

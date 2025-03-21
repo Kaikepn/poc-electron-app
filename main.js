@@ -3,16 +3,19 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const decompress = require("decompress");
+const puppeteer = require('puppeteer');
+const AdmZip = require('adm-zip');
 
 let mainWindow;
 
 function createWindow() {
-  mainWindow = new BrowserWindow({
+  const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
     }
   });
   const currentFolderPath = path.join(__dirname, 'Jogos');
@@ -151,7 +154,7 @@ function openAndExecuteFile() {
 }
 
 function testDecompress() {
-    decompress("example.zip", "Jogos")
+    decompress("TerrorDaCaatinga.exe.zip", "Jogos")
     .then((files) => {
       console.log(files);
     })
@@ -216,10 +219,11 @@ app.on('activate', () => {
 // funcção p baixar jogo usando Puppeteer
 ipcMain.handle('download-game', async (event, url) => {
   let browser = null;
+  console.log("bombardillo")
   try {
     //caminho p pasta temporaria, gera o nome unico p diretorio
     const tempDir = path.join(app.getPath('temp'), 'game-download-' + Date.now());
-    const downloadsDir = app.getPath('downloads'); //caminho da pasta 
+    const downloadsDir = path.join(__dirname, 'Jogos') //caminho da pasta 
     
     //ve seja existe 
     if (!fs.existsSync(tempDir)) {
