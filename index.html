@@ -1,44 +1,38 @@
-
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerenciador de Jogos</title>
     <script>
-        const { ipcRenderer } = require('electron');
-        
+        // Função para criar a pasta
         function createFolder() {
-            ipcRenderer.send('create-folder');
+            window.electronAPI.createFolder();
         }
 
+        // Função para abrir e executar um arquivo
         function openAndExecuteFile() {
-            ipcRenderer.send('open-file-dialog');
+            window.electronAPI.openAndExecuteFile();
         }
 
+        // Função para executar um arquivo com caminho específico
         function openAndExecuteFileByPath() {
             const filePath = document.getElementById('filePathInput').value;
             if (filePath) {
-                ipcRenderer.send('open-file-by-path', filePath);
+                window.electronAPI.openAndExecuteFileByPath(filePath);
             } else {
                 alert('Por favor, digite o caminho do arquivo.');
             }
         }
 
-        function testDecompress() {
-            ipcRenderer.send('test-decompress');
-        }
-
-        function showAlert(message) {
-            alert(message);
-        }
-
-        ipcRenderer.on('execution-result', (event, message) => {
+        // Função para exibir o resultado da execução
+        window.electronAPI.onExecutionResult((event, message) => {
             document.getElementById('output').innerText = message;
         });
 
-        ipcRenderer.on('folder-created', (event, message) => {
-            showAlert(message);
+        // Função para mostrar uma mensagem após a criação da pasta
+        window.electronAPI.onFolderCreated((event, message) => {
+            alert(message);
         });
     </script>
 </head>
@@ -46,35 +40,36 @@
     <h1>Gerenciador de Jogos</h1>
     <button onclick="createFolder()">Criar Pasta Jogos</button>
     <button onclick="openAndExecuteFile()">Abrir e Executar Arquivo</button>
+
     <div>
         <label for="filePathInput">Digite o caminho completo do arquivo para executar:</label>
         <input type="text" id="filePathInput" placeholder="/home/kaike/Área de Trabalho/Poc eletron/my-electron-app/Jogos" />
-      </div>
-      <div>
-        <button onclick="openAndExecuteFileByPath()">Executar Arquivo</button>
-      </div>
-    <button onclick="testDecompress()">Testar Extração de Arquivo</button>
-    <p id="output"></p>
-    <div class="container">
-    <h1>Download de Jogos Automático</h1>
-    
-    <div class="form-group">
-      <label for="gameUrl">URL do Jogo:</label>
-      <input type="text" id="gameUrl" placeholder="https://exemplo.com/pagina-do-jogo">
-      <small>Cole a URL da página onde está o jogo que você deseja baixar</small>
     </div>
-    
-    <button id="downloadBtn">Baixar Jogo Automaticamente</button>
-    
-    <div id="status">Aguardando URL...</div>
-    
-    <div class="progress">
-      <div class="progress-bar" id="progressBar"></div>
-    </div>
-    
-    <div class="result" id="resultBox"></div>
-  </div>
 
-  <script src="renderer.js"></script>
+    <div>
+        <button onclick="openAndExecuteFileByPath()">Executar Arquivo</button>
+    </div>
+
+    <div class="container">
+        <h1>Download de Jogos Automático</h1>
+
+        <div class="form-group">
+            <label for="gameUrl">URL do Jogo:</label>
+            <input type="text" id="gameUrl" placeholder="https://exemplo.com/pagina-do-jogo">
+            <small>Cole a URL da página onde está o jogo que você deseja baixar</small>
+        </div>
+
+        <button id="downloadBtn">Baixar Jogo Automaticamente</button>
+
+        <div id="status">Aguardando URL...</div>
+
+        <div class="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <div class="result" id="resultBox"></div>
+    </div>
+
+    <p id="output"></p>
 </body>
 </html>

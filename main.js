@@ -21,91 +21,7 @@ function createWindow() {
   const currentFolderPath = path.join(__dirname, 'Jogos');
   console.log(currentFolderPath)
 
-  const htmlContent = `
- <!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciador de Jogos</title>
-    <script>
-        const { ipcRenderer } = require('electron');
-        
-        function createFolder() {
-            ipcRenderer.send('create-folder');
-        }
-
-        function openAndExecuteFile() {
-            ipcRenderer.send('open-file-dialog');
-        }
-
-        function openAndExecuteFileByPath() {
-            const filePath = document.getElementById('filePathInput').value;
-            if (filePath) {
-                ipcRenderer.send('open-file-by-path', filePath);
-            } else {
-                alert('Por favor, digite o caminho do arquivo.');
-            }
-        }
-
-        function testDecompress() {
-            ipcRenderer.send('test-decompress');
-        }
-
-        function showAlert(message) {
-            alert(message);
-        }
-
-        ipcRenderer.on('execution-result', (event, message) => {
-            document.getElementById('output').innerText = message;
-        });
-
-        ipcRenderer.on('folder-created', (event, message) => {
-            showAlert(message);
-        });
-    </script>
-</head>
-<body>
-    <h1>Gerenciador de Jogos</h1>
-    <button onclick="createFolder()">Criar Pasta Jogos</button>
-    <button onclick="openAndExecuteFile()">Abrir e Executar Arquivo</button>
-    <div>
-        <label for="filePathInput">Digite o caminho completo do arquivo para executar:</label>
-        <input type="text" id="filePathInput" placeholder="${currentFolderPath}" />
-      </div>
-      <div>
-        <button onclick="openAndExecuteFileByPath()">Executar Arquivo</button>
-      </div>
-    <button onclick="testDecompress()">Testar Extração de Arquivo</button>
-    <p id="output"></p>
-    <div class="container">
-    <h1>Download de Jogos Automático</h1>
-    
-    <div class="form-group">
-      <label for="gameUrl">URL do Jogo:</label>
-      <input type="text" id="gameUrl" placeholder="https://exemplo.com/pagina-do-jogo">
-      <small>Cole a URL da página onde está o jogo que você deseja baixar</small>
-    </div>
-    
-    <button id="downloadBtn">Baixar Jogo Automaticamente</button>
-    
-    <div id="status">Aguardando URL...</div>
-    
-    <div class="progress">
-      <div class="progress-bar" id="progressBar"></div>
-    </div>
-    
-    <div class="result" id="resultBox"></div>
-  </div>
-
-  <script src="renderer.js"></script>
-</body>
-</html>`;
-
-  const htmlPath = path.join(__dirname, 'index.html');
-  fs.writeFileSync(htmlPath, htmlContent);
-  
-  mainWindow.loadFile(htmlPath);
+  mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -122,50 +38,61 @@ function createFolder() {
   }
 }
 
-function openAndExecuteFile() {
-  dialog.showOpenDialog(mainWindow, {
-    properties: ['openFile'],
-    title: 'Selecione o arquivo para executar'
-  }).then(result => {
-    if (!result.canceled && result.filePaths.length > 0) {
-      const filePath = result.filePaths[0];
-      console.log('Arquivo selecionado: ' + filePath);
+// extrai o arquivo
+async function testDecompress(filePath) {
+  const zipName = path.basename(filePath, path.extname(filePath)); // Nome do ZIP sem extensão
+    const baseDir = "Jogos"; // Diretório base
+    const tempExtractDir = path.join(baseDir, zipName); // Pasta temporária para extração
 
-      const quotedPath = `"${filePath}"`;
-      
-      exec(quotedPath, (error, stdout, stderr) => {
-        let message;
-        if (error) {
-          message = 'Erro ao executar o arquivo: ' + error.message;
-        } else if (stderr) {
-          message = 'stderr: ' + stderr;
-        } else {
-          message = 'Arquivo executado com sucesso: ' + stdout;
-        }
-        console.log(message);
-        if (mainWindow) {
-          mainWindow.webContents.send('execution-result', message);
-        }
-      });
+    // Criar a pasta temporária se não existir
+    if (!fs.existsSync(tempExtractDir)) {
+        fs.mkdirSync(tempExtractDir, { recursive: true });
     }
-  }).catch(err => {
-    console.error('Erro ao abrir o arquivo:', err);
-  });
+
+    // Extrair arquivos para a pasta temporária
+    const files = await decompress(filePath, tempExtractDir);
+
+    if (files.length === 1) {
+        // Se houver apenas um arquivo, usar o nome sem extensão
+        const singleFile = files[0].path;
+        const singleFileName = path.basename(singleFile, path.extname(singleFile));
+        const finalExtractDir = path.join(baseDir, singleFileName);
+
+        // Renomear a pasta temporária para remover a extensão
+        fs.renameSync(tempExtractDir, finalExtractDir);
+        console.log(`Extraído para: ${finalExtractDir}`);
+    } else {
+        console.log(`Extraído para: ${tempExtractDir}`);
+    }
 }
 
-function testDecompress() {
-    decompress("TerrorDaCaatinga.exe.zip", "Jogos")
-    .then((files) => {
-      console.log(files);
-    })
-    .catch((error) => {
-      console.log(error);
-    });
-}
 
 function openAndExecuteFileByPath(filePath) {
   if (fs.existsSync(filePath)) {
     console.log(`Executando arquivo: ${filePath}`);
+
+    // Obtém o diretório do arquivo
+    const dirPath = path.dirname(filePath);
+    const tempFilePath = path.join(dirPath, 'info.txt');
+
+    // Cria o arquivo info.txt e escreve "algo" dentro
+
+    
+    ////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////
+    ////// ESCREVER O USER E A SENHA AQUI QUANDO LOGAR  ////
+    ////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////
+    
+    fs.writeFile(tempFilePath, 'user', (err) => {
+      if (err) {
+        console.error('Erro ao criar info.txt:', err);
+      } else {
+        console.log('info.txt criado com sucesso.');
+      }
+    });
+
+    // Executa o arquivo
     exec(`"${filePath}"`, (error, stdout, stderr) => {
       if (error) {
         console.error(`Erro ao executar o arquivo: ${error.message}`);
@@ -193,7 +120,6 @@ ipcMain.on('open-file-by-path', (event, filePath) => {
 app.whenReady().then(() => {
   createWindow();
   createFolder();
-  testDecompress();
 });
 
 app.on('window-all-closed', () => {
@@ -219,11 +145,10 @@ app.on('activate', () => {
 // funcção p baixar jogo usando Puppeteer
 ipcMain.handle('download-game', async (event, url) => {
   let browser = null;
-  console.log("bombardillo")
   try {
     //caminho p pasta temporaria, gera o nome unico p diretorio
     const tempDir = path.join(app.getPath('temp'), 'game-download-' + Date.now());
-    const downloadsDir = path.join(__dirname, 'Jogos') //caminho da pasta 
+    const downloadsDir = path.join(__dirname) //caminho da pasta 
     
     //ve seja existe 
     if (!fs.existsSync(tempDir)) {
@@ -375,6 +300,7 @@ ipcMain.handle('download-game', async (event, url) => {
     // Pega o arquivo baixado 
     const downloadedFile = files[0];
     const filePath = path.join(tempDir, downloadedFile);
+
     
     // Espera até que o arquivo esteja completamente baixado 
     let fileIsReady = !downloadedFile.endsWith('.crdownload') && !downloadedFile.endsWith('.part');
@@ -406,15 +332,30 @@ ipcMain.handle('download-game', async (event, url) => {
     // Encontra arquivos exe
     const exeFiles = finalFiles.filter(f => f.endsWith('.exe'));
     const targetFile = exeFiles.length > 0 ? exeFiles[0] : finalFiles[0];
-    const targetPath = path.join(tempDir, targetFile);
+    const targetPath = path.join(tempDir, targetFile);    
     
     // Caminho para o arquivo ZIP final
     const zipPath = path.join(downloadsDir, `${targetFile}.zip`);
-    
     // Criar ZIP com o arquivo baixado
     const zip = new AdmZip();
     zip.addLocalFile(targetPath, '', targetFile);
     zip.writeZip(zipPath);
+
+    // extrair zip criado
+    testDecompress(zipPath)
+      .then(() => {
+        // Remover o arquivo ZIP após a extração
+        fs.unlink(zipPath, (err) => {
+          if (err) {
+            console.error(`Erro ao excluir o arquivo ZIP: ${err}`);
+          } else {
+            console.log(`Arquivo ZIP ${zipPath} excluído com sucesso.`);
+          }
+        });
+      })
+      .catch((error) => {
+        console.error(`Erro ao extrair o ZIP: ${error}`);
+      });
     
     // Fechar o navegador
     await browser.close();
