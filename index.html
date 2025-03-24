@@ -1,75 +1,52 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciador de Jogos</title>
-    <script>
-        // Função para criar a pasta
-        function createFolder() {
-            window.electronAPI.createFolder();
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Electron App</title>
+  <script>
+    // Função para executar um arquivo com caminho específico
+    function openAndExecuteFileByPath() {
+      const filePath = document.getElementById('filePathInput').value;
+      if (filePath) {
+        window.electronAPI.openAndExecuteFileByPath(filePath);
+      } else {
+        alert('Por favor, digite o caminho do arquivo.');
+      }
+    }
 
-        // Função para abrir e executar um arquivo
-        function openAndExecuteFile() {
-            window.electronAPI.openAndExecuteFile();
-        }
-
-        // Função para executar um arquivo com caminho específico
-        function openAndExecuteFileByPath() {
-            const filePath = document.getElementById('filePathInput').value;
-            if (filePath) {
-                window.electronAPI.openAndExecuteFileByPath(filePath);
-            } else {
-                alert('Por favor, digite o caminho do arquivo.');
-            }
-        }
-
-        // Função para exibir o resultado da execução
-        window.electronAPI.onExecutionResult((event, message) => {
-            document.getElementById('output').innerText = message;
+    // Função para iniciar o download de um jogo
+    function downloadGame() {
+      const gameUrl = document.getElementById('gameUrl').value;
+      if (gameUrl) {
+        window.electronAPI.downloadGame(gameUrl).then(result => {
+          document.getElementById('output').innerText = result;
+        }).catch(error => {
+          document.getElementById('output').innerText = error;
         });
+      } else {
+        alert('Por favor, insira a URL do jogo.');
+      }
+    }
 
-        // Função para mostrar uma mensagem após a criação da pasta
-        window.electronAPI.onFolderCreated((event, message) => {
-            alert(message);
-        });
-    </script>
+    // Função para exibir o resultado da execução
+    window.electronAPI.onExecutionResult((event, message) => {
+      document.getElementById('output').innerText = message;
+    });
+  </script>
 </head>
 <body>
-    <h1>Gerenciador de Jogos</h1>
-    <button onclick="createFolder()">Criar Pasta Jogos</button>
-    <button onclick="openAndExecuteFile()">Abrir e Executar Arquivo</button>
+  <h1>POC iupi</h1>
+  <div>
+    <label for="filePathInput">Caminho do Arquivo:</label>
+    <input type="text" id="filePathInput" placeholder="Digite o caminho do arquivo">
+    <button onclick="openAndExecuteFileByPath()">Abrir e Executar Arquivo</button>
+  </div>
 
-    <div>
-        <label for="filePathInput">Digite o caminho completo do arquivo para executar:</label>
-        <input type="text" id="filePathInput" placeholder="/home/kaike/Área de Trabalho/Poc eletron/my-electron-app/Jogos" />
-    </div>
-
-    <div>
-        <button onclick="openAndExecuteFileByPath()">Executar Arquivo</button>
-    </div>
-
-    <div class="container">
-        <h1>Download de Jogos Automático</h1>
-
-        <div class="form-group">
-            <label for="gameUrl">URL do Jogo:</label>
-            <input type="text" id="gameUrl" placeholder="https://exemplo.com/pagina-do-jogo">
-            <small>Cole a URL da página onde está o jogo que você deseja baixar</small>
-        </div>
-
-        <button id="downloadBtn">Baixar Jogo Automaticamente</button>
-
-        <div id="status">Aguardando URL...</div>
-
-        <div class="progress">
-            <div class="progress-bar" id="progressBar"></div>
-        </div>
-
-        <div class="result" id="resultBox"></div>
-    </div>
-
-    <p id="output"></p>
+  <div>
+    <label for="gameUrl">URL do Jogo:</label>
+    <input type="text" id="gameUrl" placeholder="Digite a URL do jogo">
+    <button onclick="downloadGame()">Baixar Jogo</button>
+  </div>
 </body>
 </html>
