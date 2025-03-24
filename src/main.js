@@ -18,7 +18,7 @@ function createWindow() {
       nodeIntegration: false
     }
   });
-  const currentFolderPath = path.join(__dirname, 'Jogos');
+  const currentFolderPath = path.join(__dirname, '../jogos');
   console.log(currentFolderPath)
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
@@ -27,9 +27,10 @@ function createWindow() {
     mainWindow = null;
   });
 }
-
 function createFolder() {
-  const folderPath = path.join(__dirname, 'Jogos');
+  // Caminho para a pasta fora da pasta 'src'
+  const folderPath = path.join(__dirname, '../jogos');
+  
   if (!fs.existsSync(folderPath)) {
     fs.mkdirSync(folderPath);
     console.log('Pasta criada com sucesso!');
@@ -41,7 +42,7 @@ function createFolder() {
 // extrai o arquivo
 async function testDecompress(filePath) {
   const zipName = path.basename(filePath, path.extname(filePath)); // Nome do ZIP sem extensão
-    const baseDir = "Jogos"; // Diretório base
+    const baseDir = "jogos"; // Diretório base
     const tempExtractDir = path.join(baseDir, zipName); // Pasta temporária para extração
 
     // Criar a pasta temporária se não existir
@@ -65,7 +66,6 @@ async function testDecompress(filePath) {
         console.log(`Extraído para: ${tempExtractDir}`);
     }
 }
-
 
 function openAndExecuteFileByPath(filePath) {
   if (fs.existsSync(filePath)) {
@@ -148,7 +148,8 @@ ipcMain.handle('download-game', async (event, url) => {
   try {
     //caminho p pasta temporaria, gera o nome unico p diretorio
     const tempDir = path.join(app.getPath('temp'), 'game-download-' + Date.now());
-    const downloadsDir = path.join(__dirname) //caminho da pasta 
+    
+    const downloadsDir = path.join(__dirname, '../downloads'); //caminho da pasta 
     
     //ve seja existe 
     if (!fs.existsSync(tempDir)) {
