@@ -1,24 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Electron App</title>
+  <script>
+    // Função para executar um arquivo com caminho específico
+    function openAndExecuteFileByPath() {
+      const filePath = document.getElementById('filePathInput').value;
+      if (filePath) {
+        window.electronAPI.openAndExecuteFileByPath(filePath);
+      } else {
+        alert('Por favor, digite o caminho do arquivo.');
+      }
+    }
 
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Teste arquivo</title>
-      </head>
-      <body>
-        <h1>Teste arquivo</h1>
-        <button id="selectFile">Selecione e rode o arquivo</button>
-        <div id="output"></div>
-        <script>
-          const { ipcRenderer } = require('electron');
-          document.getElementById('selectFile').addEventListener('click', function() {
-            ipcRenderer.send('open-file-dialog');
-          });
-          
-          ipcRenderer.on('execution-result', function(event, result) {
-            const outputDiv = document.getElementById('output');
-            outputDiv.innerHTML += '<p>' + result + '</p>';
-          });
-        </script>
-      </body>
-    </html>
-  
+    // Função para iniciar o download de um jogo
+    function downloadGame() {
+      const gameUrl = document.getElementById('gameUrl').value;
+      if (gameUrl) {
+        window.electronAPI.downloadGame(gameUrl).then(result => {
+          document.getElementById('output').innerText = result;
+        }).catch(error => {
+          document.getElementById('output').innerText = error;
+        });
+      } else {
+        alert('Por favor, insira a URL do jogo.');
+      }
+    }
+
+    // Função para exibir o resultado da execução
+    window.electronAPI.onExecutionResult((event, message) => {
+      document.getElementById('output').innerText = message;
+    });
+  </script>
+</head>
+<body>
+  <h1>POC iupi</h1>
+  <div>
+    <label for="filePathInput">Caminho do Arquivo:</label>
+    <input type="text" id="filePathInput" placeholder="Digite o caminho do arquivo">
+    <button onclick="openAndExecuteFileByPath()">Abrir e Executar Arquivo</button>
+  </div>
+
+  <div>
+    <label for="gameUrl">URL do Jogo:</label>
+    <input type="text" id="gameUrl" placeholder="Digite a URL do jogo">
+    <button onclick="downloadGame()">Baixar Jogo</button>
+  </div>
+</body>
+</html>
