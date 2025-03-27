@@ -6,8 +6,6 @@ const decompress = require("decompress");
 const puppeteer = require('puppeteer');
 const AdmZip = require('adm-zip');
 
-let mainWindow;
-
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 800,
@@ -37,34 +35,6 @@ function createFolder() {
   } else {
     console.log('A pasta já existe!');
   }
-}
-
-// extrai o arquivo
-async function testDecompress(filePath) {
-  const zipName = path.basename(filePath, path.extname(filePath)); // Nome do ZIP sem extensão
-    const baseDir = "jogos"; // Diretório base
-    const tempExtractDir = path.join(baseDir, zipName); // Pasta temporária para extração
-
-    // Criar a pasta temporária se não existir
-    if (!fs.existsSync(tempExtractDir)) {
-        fs.mkdirSync(tempExtractDir, { recursive: true });
-    }
-
-    // Extrair arquivos para a pasta temporária
-    const files = await decompress(filePath, tempExtractDir);
-
-    if (files.length === 1) {
-        // Se houver apenas um arquivo, usar o nome sem extensão
-        const singleFile = files[0].path;
-        const singleFileName = path.basename(singleFile, path.extname(singleFile));
-        const finalExtractDir = path.join(baseDir, singleFileName);
-
-        // Renomear a pasta temporária para remover a extensão
-        fs.renameSync(tempExtractDir, finalExtractDir);
-        console.log(`Extraído para: ${finalExtractDir}`);
-    } else {
-        console.log(`Extraído para: ${tempExtractDir}`);
-    }
 }
 
 function openAndExecuteFileByPath(filePath) {
@@ -144,232 +114,41 @@ app.on('activate', () => {
 
 // funcção p baixar jogo usando Puppeteer
 ipcMain.handle('download-game', async (event, url) => {
+  downloadGame(url)
+});
+
+
+//
+
+async function downloadGame(url) {
   let browser = null;
   try {
-    //caminho p pasta temporaria, gera o nome unico p diretorio
-    const tempDir = path.join(app.getPath('temp'), 'game-download-' + Date.now());
+    // Verifique se a pasta 'jogos' existe dentro da pasta Downloads
+    const downloadsDir = path.join(__dirname, '..', 'jogos');
     
-    const downloadsDir = path.join(__dirname, '../downloads'); //caminho da pasta 
-    
-    //ve seja existe 
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
+    // Se a pasta não existir, cria a pasta 'jogos'
+    if (!fs.existsSync(downloadsDir)) {
+      fs.mkdirSync(downloadsDir, { recursive: true });
     }
-    
-    // puppeteer - sempre em modo headless (sem interface gráfica)
-    browser = await puppeteer.launch({
-      headless: 'new', // Use o novo modo headless sempre
-      defaultViewport: null,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-    
-    // cria nova aba no nav
-    const page = await browser.newPage();
-    
-    // Configurar onde os downloads serão salvos
-    const client = await page.target().createCDPSession(); //sessão do prot devTools p ter controle sob o nav
-    await client.send('Page.setDownloadBehavior', { //config o comportamento de download da pag
-      behavior: 'allow', //download automatico sem interaão do usuário
-      downloadPath: tempDir //pasta q os arq serão baixados
-    });
-    
-    // Navegar p URL
-    await page.goto(url, { waitUntil: 'networkidle2' });
-    console.log(`Navegou para: ${url}`);
-    
-    // Seletores aprimorados para detecção automática de botões de download
-    const seletor = 
-  'a[href*=".exe"], ' + 
-  'a[download], ' +
-  '.download-button, ' + 
-  '#download-button, ' +
-  'a.btn-download, ' +
-  'button.download, ' +
-  'a[href*=".zip"], ' +
-  'a[href*=".msi"], ' +
-  'a[href*="download"]';
-    
-    console.log(`Procurando pelo botão de download usando seletor: ${seletor}`);
-    
-    // Tentar encontrar o elemento 
-    try {
-      await page.waitForSelector(seletor, { visible: true, timeout: 5000 });
-      console.log('Botão de download encontrado pelo seletor!');
-    } catch (error) {
-      console.log('Seletor não encontrado, tentando avaliação de página...');
-      
-      // Se o seletor não for encontrado, tente encontrar links que pareçam ser de download
-      const downloadLinks = await page.evaluate(() => { 
-        const links = Array.from(document.querySelectorAll('a'));//acessa o dom da pagina p achar o botão
-        return links
-        //verifica se o link parece um link de download
-          .filter(link => {
-            const href = (link.href || '').toLowerCase();
-            const text = (link.innerText || '').toLowerCase();
-            return (href.includes('.exe') || 
-                   href.includes('Download') || 
-                   href.includes('.zip') || 
-                  //  href.includes('.msi') ||
-                  //  href.includes('.rar') ||
-                  //  href.includes('get') ||
-                   text.includes('download') ||
-                  //  text.includes('get') ||
-                   text.includes('install')) &&
-                   link.offsetWidth > 0 && 
-                   link.offsetHeight > 0;
-          })
-          //cria um array com + detalhes sobre os links
-          .map((link, index) => ({
-            index,
-            href: link.href,
-            text: link.innerText,
-            position: link.getBoundingClientRect()
-          }));
-      });
-      
-      console.log('Possíveis links de download encontrados:', downloadLinks);
-      
-      if (downloadLinks.length > 0) {
-        // Encontra o link que mais provavelmente é de download
-        // Priorizando links com palavras-chave específicas
-        let bestLinkIndex = 0;
-        let bestScore = 0;
-        
-        downloadLinks.forEach((link, index) => {
-          let score = 0;
-          const href = link.href.toLowerCase();
-          const text = link.text.toLowerCase();
-          
-          if (href.includes('.exe')) score += 5;
-          if (href.includes('.zip')) score += 4;
-          // if (href.includes('.msi')) score += 4;
-          if (text.includes('download now')) score += 3;
-          if (text.includes('Download')) score += 2;
-          if(text.includes('Download Now')) score += 2
-          // if (href.includes('download')) score += 2;
-          if (link.position.y < 500) score += 1; // Links mais no topo têm prioridade
-          
-          if (score > bestScore) {
-            bestScore = score;
-            bestLinkIndex = index;
-          }
-        });
-        
-        // clica no melhor link encontrado
-        const bestLink = downloadLinks[bestLinkIndex];
-        console.log(`Selecionado melhor link: ${bestLink.text} (${bestLink.href})`);
-        
-        try {
-          await page.click(`a[href="${bestLink.href}"]`);
-          console.log('Clicou no link de download!');
-        } catch (clickError) {
-          console.log('Erro ao clicar no link, tentando via JavaScript:', clickError);
-          // Se não conseguir clicar diretamente, tenta via JavaScript
-          await page.evaluate((href) => {
-            const links = Array.from(document.querySelectorAll('a'));
-            const targetLink = links.find(link => link.href === href);
-            if (targetLink) targetLink.click();
-          }, bestLink.href);
-        }
-      } else {
-        throw new Error('Não foi possível encontrar o botão de download');
-      }
-    }
-    
-    // clica no botão se o botão foi achado pelo seletor
-    if (await page.$(seletor)) {
-      await Promise.all([
-        page.click(seletor),
-        new Promise(resolve => setTimeout(resolve, 2000))
-      ]);
-      console.log('Clicou no botão de download via seletor');
-    }
-    
-    console.log('Aguardando download...');
-    
-    // Esperar alguns segundos para garantir que o download foi iniciado
-    await new Promise(resolve => setTimeout(resolve, 10000));
-    
-    // Verificar quais arquivos foram baixados
-    const files = fs.readdirSync(tempDir);
-    console.log('Arquivos encontrados:', files);
-    
-    if (files.length === 0) {
-      throw new Error('Nenhum arquivo foi baixado');
-    }
-    
-    // Pega o arquivo baixado 
-    const downloadedFile = files[0];
-    const filePath = path.join(tempDir, downloadedFile);
 
+    // Baixar o jogo para a pasta 'jogos'
+    const finalFiles = await installGame(url, downloadsDir); 
     
-    // Espera até que o arquivo esteja completamente baixado 
-    let fileIsReady = !downloadedFile.endsWith('.crdownload') && !downloadedFile.endsWith('.part');
-    let attempts = 0;
-    const maxAttempts = 60; // 5 minutos (60 x 5s)
+    // Após o download, extrair o jogo
+    const extractedFilePath = await extractGame(downloadsDir, finalFiles);
     
-    while (!fileIsReady && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Esperar 5 segundos
-      const currentFiles = fs.readdirSync(tempDir);
-      
-      // Verificar se algum arquivo tem extensão .crdownload ou .part
-      const pendingFiles = currentFiles.filter(f => f.endsWith('.crdownload') || f.endsWith('.part'));
-      fileIsReady = pendingFiles.length === 0 && currentFiles.length > 0;
-      //tentativas (60 de 5s)
-      attempts++;
-      console.log(`Verificando download... Tentativa ${attempts}/${maxAttempts}`);
-    }
-    
-    if (!fileIsReady) {
-      throw new Error('Tempo esgotado esperando o download completar');
-    }
-    
-    // cria um zip qnd baixar
-    const finalFiles = fs.readdirSync(tempDir);
-    if (finalFiles.length === 0) {
-      throw new Error('Nenhum arquivo foi baixado');
-    }
-    
-    // Encontra arquivos exe
-    const exeFiles = finalFiles.filter(f => f.endsWith('.exe'));
-    const targetFile = exeFiles.length > 0 ? exeFiles[0] : finalFiles[0];
-    const targetPath = path.join(tempDir, targetFile);    
-    
-    // Caminho para o arquivo ZIP final
-    const zipPath = path.join(downloadsDir, `${targetFile}.zip`);
-    // Criar ZIP com o arquivo baixado
-    const zip = new AdmZip();
-    zip.addLocalFile(targetPath, '', targetFile);
-    zip.writeZip(zipPath);
+    console.log(`Arquivos extraídos para: ${extractedFilePath}`);
 
-    // extrair zip criado
-    testDecompress(zipPath)
-      .then(() => {
-        // Remover o arquivo ZIP após a extração
-        fs.unlink(zipPath, (err) => {
-          if (err) {
-            console.error(`Erro ao excluir o arquivo ZIP: ${err}`);
-          } else {
-            console.log(`Arquivo ZIP ${zipPath} excluído com sucesso.`);
-          }
-        });
-      })
-      .catch((error) => {
-        console.error(`Erro ao extrair o ZIP: ${error}`);
-      });
+    // Verificar os arquivos baixados
+    const installedFiles = fs.readdirSync(downloadsDir);
+    console.log('Todos os arquivos encontrados no diretório de downloads:', installedFiles);
     
-    // Fechar o navegador
-    await browser.close();
-    browser = null;
-    
-    // Limpar diretório temporário
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    // Limpeza ou qualquer outro passo adicional
+    // fs.rmSync(tempDir, { recursive: true, force: true });  // Se for necessário limpar algum diretório temporário
     
     return {
       success: true,
-      message: 'Download concluído com sucesso',
-      path: zipPath,
-      fileName: targetFile
+      message: 'Download e extração concluídos com sucesso'
     };
   } catch (error) {
     console.error('Erro no download:', error);
@@ -388,4 +167,311 @@ ipcMain.handle('download-game', async (event, url) => {
       message: `Erro: ${error.message}`
     };
   }
-});
+}
+
+
+
+
+/////////////////////////////////
+
+
+async function installGame(url, downloadsDir){
+  // puppeteer - sempre em modo headless (sem interface gráfica)
+  const browser = await puppeteer.launch({
+    headless: 'new', // Use o novo modo headless sempre
+    defaultViewport: null,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+  
+  // cria nova aba no navegador
+  const page = await browser.newPage();
+  
+  // Configurar onde os downloads serão salvos
+  const client = await page.createCDPSession(); // sessão do devTools p ter controle sob o navegador
+  await client.send('Page.setDownloadBehavior', { // configura o comportamento de download da página
+    behavior: 'allow', // download automático sem interação do usuário
+    downloadPath: downloadsDir // pasta para onde os arquivos serão baixados
+  });
+  
+  // Navegar para a URL fornecida
+  await page.goto(url, { waitUntil: 'networkidle2' });
+  console.log(`Navegou para: ${url}`);
+  
+  // Seletor aprimorado para detecção automática de botões de download
+  const seletor = 
+    'a[href*=".exe"], ' + 
+    'a[download], ' +
+    '.download-button, ' + 
+    '#download-button, ' +
+    'a.btn-download, ' +
+    'button.download, ' +
+    'a[href*=".zip"], ' +
+    'a[href*=".msi"], ' +
+    'a[href*="download"]';
+  
+  console.log(`Procurando pelo botão de download usando seletor: ${seletor}`);
+  
+  // Tentativa de encontrar o elemento 
+  try {
+    await page.waitForSelector(seletor, { visible: true, timeout: 5000 });
+    console.log('Botão de download encontrado pelo seletor!');
+  } catch (error) {
+    console.log('Seletor não encontrado, tentando avaliação de página...');
+    
+    // Se o seletor não for encontrado, tentar encontrar links que pareçam ser de download
+    const downloadLinks = await page.evaluate(() => { 
+      const links = Array.from(document.querySelectorAll('a'));
+      return links
+        .filter(link => {
+          const href = (link.href || '').toLowerCase();
+          const text = (link.innerText || '').toLowerCase();
+          return (href.includes('.exe') || 
+                 href.includes('Download') || 
+                 href.includes('.zip') || 
+                 text.includes('download') ||
+                 text.includes('install')) &&
+                 link.offsetWidth > 0 && 
+                 link.offsetHeight > 0;
+        })
+        .map((link, index) => ({
+          index,
+          href: link.href,
+          text: link.innerText,
+          position: link.getBoundingClientRect()
+        }));
+    });
+    
+    console.log('Possíveis links de download encontrados:', downloadLinks);
+    
+    if (downloadLinks.length > 0) {
+      // Encontrar o link de download mais apropriado
+      let bestLinkIndex = 0;
+      let bestScore = 0;
+      
+      downloadLinks.forEach((link, index) => {
+        let score = 0;
+        const href = link.href.toLowerCase();
+        const text = link.text.toLowerCase();
+        
+        if (href.includes('.exe')) score += 5;
+        if (href.includes('.zip')) score += 4;
+        if (text.includes('download now')) score += 3;
+        if (text.includes('Download')) score += 2;
+        if (link.position.y < 500) score += 1; // Links mais no topo têm prioridade
+        
+        if (score > bestScore) {
+          bestScore = score;
+          bestLinkIndex = index;
+        }
+      });
+      
+      // Clica no melhor link encontrado
+      const bestLink = downloadLinks[bestLinkIndex];
+      console.log(`Selecionado melhor link: ${bestLink.text} (${bestLink.href})`);
+      
+      try {
+        await page.click(`a[href="${bestLink.href}"]`);
+        console.log('Clicou no link de download!');
+      } catch (clickError) {
+        console.log('Erro ao clicar no link, tentando via JavaScript:', clickError);
+        await page.evaluate((href) => {
+          const links = Array.from(document.querySelectorAll('a'));
+          const targetLink = links.find(link => link.href === href);
+          if (targetLink) targetLink.click();
+        }, bestLink.href);
+      }
+    } else {
+      throw new Error('Não foi possível encontrar o botão de download');
+    }
+  }
+  
+  // Aguardar o download completar
+  console.log('Aguardando download...');
+  await new Promise(resolve => setTimeout(resolve, 10000));
+  
+  // Verificar os arquivos baixados
+  const files = fs.readdirSync(downloadsDir);
+  
+  if (files.length === 0) {
+    throw new Error('Nenhum arquivo foi baixado');
+  }
+
+  // Ordena os arquivos pela data de modificação (mais recente primeiro)
+  const filesWithStats = files.map(file => {
+    const filePath = path.join(downloadsDir, file);
+    const stats = fs.statSync(filePath);
+    return { file, stats };
+  });
+
+  filesWithStats.sort((a, b) => b.stats.mtime - a.stats.mtime);
+
+  // Pega o arquivo mais recente
+  const downloadedFile = filesWithStats[0].file;
+  console.log('Arquivo mais recente baixado:', downloadedFile);
+  
+  // Espera o arquivo ser totalmente baixado
+  let fileIsReady = !downloadedFile.endsWith('.crdownload') && !downloadedFile.endsWith('.part');
+  let attempts = 0;
+  const maxAttempts = 60; // 5 minutos (60 tentativas de 5 segundos)
+  
+  while (!fileIsReady && attempts < maxAttempts) {
+    await new Promise(resolve => setTimeout(resolve, 5000)); // Espera 5 segundos
+    const currentFiles = fs.readdirSync(downloadsDir);
+    
+    const pendingFiles = currentFiles.filter(f => f.endsWith('.crdownload') || f.endsWith('.part'));
+    fileIsReady = pendingFiles.length === 0 && currentFiles.length > 0;
+    attempts++;
+    console.log(`Verificando download... Tentativa ${attempts}/${maxAttempts}`);
+  }
+  
+  if (!fileIsReady) {
+    throw new Error('Tempo esgotado esperando o download completar');
+  }
+
+  // Retorna os arquivos baixados
+  const finalFiles = fs.readdirSync(downloadsDir);
+
+  return finalFiles;
+}
+
+async function extractGame(downloadsDir, finalFiles) {
+  // Encontra arquivos exe ou zip
+  const zipFiles = finalFiles.filter(f => f.toLowerCase().endsWith('.zip'));
+  const exeFiles = finalFiles.filter(f => f.toLowerCase().endsWith('.exe'));
+
+  // Define o arquivo alvo, seja .exe ou .zip
+  let targetFile = null;
+  let zipPath = null;
+  let targetPath = null;
+
+  if (exeFiles.length > 0) {
+    // Se encontrar arquivos .exe, cria uma pasta com o nome do arquivo (sem a extensão .exe)
+    targetFile = exeFiles[0];
+    targetPath = path.join(downloadsDir, targetFile);
+
+    // Nome da pasta será o nome do arquivo .exe sem a extensão
+    const folderName = path.basename(targetFile, path.extname(targetFile));
+    const folderPath = path.join(downloadsDir, folderName);
+
+    // Cria a pasta caso não exista
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath, { recursive: true });
+    }
+
+    // Define o novo caminho para o arquivo .exe dentro da pasta criada
+    const newExePath = path.join(folderPath, targetFile);
+
+    // Move o arquivo .exe para a nova pasta
+    fs.renameSync(targetPath, newExePath);
+
+    console.log(`Arquivo .exe movido para a pasta: ${newExePath}`);
+    // Retorna o caminho do arquivo .exe para futura instalação ou execução
+    return newExePath;
+
+  } else if (zipFiles.length > 0) {
+    // Se encontrar arquivos .zip, seleciona diretamente
+    targetFile = zipFiles[0];
+    targetPath = path.join(downloadsDir, targetFile);
+    zipPath = path.join(downloadsDir, targetFile);
+    console.log("Caminho normalizado do arquivo ZIP:", zipPath);
+
+    console.log("Arquivo .zip encontrado: " + targetFile);
+
+    // Agora, vamos extrair o conteúdo do arquivo ZIP
+    console.log("Iniciando a extração do arquivo ZIP:", zipPath);
+
+    // Decompressão do arquivo ZIP
+    await testDecompress(zipPath)
+      .then(() => {
+        // Verifica se o arquivo ZIP não é do tipo .zip original
+        if (!zipPath.endsWith('.zip')) {
+          // Remover o arquivo ZIP após a extração se não for um arquivo .zip original
+          fs.unlink(zipPath, (err) => {
+            if (err) {
+              console.error(`Erro ao excluir o arquivo ZIP: ${err}`);
+            } else {
+              console.log(`Arquivo ZIP ${zipPath} excluído com sucesso.`);
+            }
+          });
+        }
+      })
+      .catch((error) => {
+        console.error("Erro ao extrair o ZIP:", error);
+      });
+
+    // Excluir o arquivo ZIP original após a extração
+    fs.unlink(zipPath, (err) => {
+      if (err) {
+        console.error(`Erro ao excluir o arquivo ZIP base: ${err}`);
+      } else {
+        console.log(`Arquivo ZIP base excluído com sucesso: ${zipPath}`);
+      }
+    });
+
+    return zipPath;  // Retorna o caminho do arquivo ZIP
+  } else {
+    console.log("Nenhum arquivo .exe ou .zip encontrado.");
+    return null;
+  }
+}
+
+
+
+
+// function a(){
+//   else if (rarFiles.length > 0) {
+//     targetFile = rarFiles[0];
+//     archivePath = path.join(downloadsDir, targetFile);
+
+//     isRar = true;
+//     console.log("Arquivo .rar encontrado: " + targetFile);
+//     console.log("local: "+archivePath)
+//   }
+// }
+
+// extrai o arquivo
+async function testDecompress(filePath) {
+  try {
+      const zipName = path.basename(filePath, path.extname(filePath)); // Nome do ZIP sem extensão
+      const baseDir = "jogos"; // Diretório base
+      const tempExtractDir = path.join(baseDir, zipName); // Pasta temporária para extração
+      
+      // Criar a pasta base se não existir
+      if (!fs.existsSync(baseDir)) {
+          fs.mkdirSync(baseDir, { recursive: true });
+      }
+
+      // Criar a pasta temporária se não existir
+      if (!fs.existsSync(tempExtractDir)) {
+          fs.mkdirSync(tempExtractDir, { recursive: true });
+      }
+
+      // Extrair arquivos para a pasta temporária
+      let files = await decompress(filePath, tempExtractDir);
+
+      if (files.length === 0) {
+          console.log("Nenhum arquivo extraído.");
+          files = null; // Libera a variável após o uso
+          return;
+      }
+
+      if (files.length === 1) {
+          const singleFile = files[0].path;
+          const singleFileName = path.basename(singleFile, path.extname(singleFile));
+          const finalExtractDir = path.join(baseDir, singleFileName);
+
+          // Se a pasta final já existir, não renomeia para evitar erro
+          if (!fs.existsSync(finalExtractDir)) {
+              fs.renameSync(tempExtractDir, finalExtractDir);
+              console.log(`Extraído para: ${finalExtractDir}`);
+          } else {
+              console.log(`A pasta ${finalExtractDir} já existe. Arquivos extraídos em: ${tempExtractDir}`);
+          }
+      } else {
+          console.log(`Extraído para: ${tempExtractDir}`);
+      }
+
+  } catch (error) {
+      console.error("Erro ao extrair o arquivo:", error);
+  }
+}
